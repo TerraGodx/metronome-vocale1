@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Métronome Vocal — Anti-Bégaiement</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #151820;
+    --border: #1f2330;
+    --accent: #c8f564;
+    --accent2: #64c8f5;
+    --text: #e8ecf4;
+    --muted: #5a6070;
+    --danger: #f56464;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Background ambience */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: 50%; transform: translateX(-50%);
+    width: 700px; height: 700px;
+    background: radial-gradient(circle, rgba(200,245,100,0.05) 0%, transparent 70%);
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+
+  body.running::before {
+    opacity: 1;
+    animation: breathe 2s ease-in-out infinite;
+  }
+
+  @keyframes breathe {
+    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.6; }
+    50% { transform: translateX(-50%) scale(1.3); opacity: 1; }
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 50px;
+  }
+
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  h1 span { color: var(--accent); font-style: italic; }
+
+  .subtitle {
+    margin-top: 10px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  /* Main orb */
+  .orb-container {
+    position: relative;
+    width: 220px; height: 220px;
+    margin: 0 auto 50px;
+    cursor: pointer;
+  }
+
+  .orb {
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color 0.3s, background 0.3s;
+    position: relative;
+    z-index: 2;
+  }
+
+  .orb-ring {
+    position: absolute;
+    inset: -12px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    transition: border-color 0.3s;
+  }
+
+  .orb-ring-2 {
+    position: absolute;
+    inset: -24px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    transition: border-color 0.3s;
+  }
+
+  .running .orb-ring {
+    border-color: rgba(200,245,100,0.3);
+    animation: ringPulse 1s ease-in-out infinite;
+  }
+
+  .running .orb-ring-2 {
+    border-color: rgba(200,245,100,0.1);
+    animation: ringPulse 1s ease-in-out infinite 0.2s;
+  }
+
+  @keyframes ringPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.5; }
+  }
+
+  .orb-beat {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+    z-index: 1;
+  }
+
+  .orb-beat.flash {
+    animation: beatFlash 0.12s ease-out forwards;
+  }
+
+  @keyframes beatFlash {
+    0% { opacity: 0.35; transform: scale(0.95); }
+    100% { opacity: 0; transform: scale(1.1); }
+  }
+
+  .orb-icon {
+    font-size: 2.2rem;
+    line-height: 1;
+    z-index: 3;
+  }
+
+  .orb-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    z-index: 3;
+  }
+
+  /* BPM display */
+  .bpm-display {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+
+  .bpm-number {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(4rem, 12vw, 7rem);
+    line-height: 1;
+    color: var(--accent);
+    letter-spacing: -0.03em;
+  }
+
+  .bpm-unit {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Slider */
+  .slider-section {
+    width: 100%;
+    max-width: 420px;
+    margin-bottom: 40px;
+  }
+
+  .slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+
+  input[type=range] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px rgba(200,245,100,0.5);
+    transition: box-shadow 0.2s;
+  }
+
+  input[type=range]:hover::-webkit-slider-thumb {
+    box-shadow: 0 0 20px rgba(200,245,100,0.8);
+  }
+
+  /* Tempo presets */
+  .presets {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 420px;
+    margin-bottom: 40px;
+  }
+
+  .preset-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .preset-btn:hover, .preset-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(200,245,100,0.06);
+  }
+
+  /* Exercise phrases */
+  .exercise-section {
+    width: 100%;
+    max-width: 500px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 30px;
+  }
+
+  .section-title {
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .phrase-display {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.4rem;
+    line-height: 1.5;
+    color: var(--text);
+    min-height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    letter-spacing: 0.01em;
+    transition: opacity 0.3s;
+  }
+
+  .phrase-display .word {
+    display: inline-block;
+    margin: 0 4px;
+    transition: color 0.1s, transform 0.1s;
+  }
+
+  .phrase-display .word.active {
+    color: var(--accent);
+    transform: scale(1.08);
+  }
+
+  .phrase-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .phrase-nav {
+    display: flex; gap: 8px;
+  }
+
+  .icon-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 1rem;
+    width: 34px; height: 34px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .icon-btn:hover {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  .phrase-counter {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* Tips */
+  .tip-box {
+    width: 100%;
+    max-width: 500px;
+    border-left: 3px solid var(--accent2);
+    padding: 14px 18px;
+    background: rgba(100,200,245,0.04);
+    border-radius: 0 8px 8px 0;
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .tip-box strong {
+    color: var(--accent2);
+    font-weight: 500;
+  }
+
+  /* Beat indicator dots */
+  .beat-dots {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 30px;
+  }
+
+  .beat-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.05s, transform 0.05s;
+  }
+
+  .beat-dot.lit {
+    background: var(--accent);
+    transform: scale(1.4);
+  }
+
+  /* Session stats */
+  .stats {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    margin-bottom: 40px;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Play button */
+  .play-btn {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+    color: var(--bg);
+    box-shadow: 0 0 30px rgba(200,245,100,0.3);
+    transition: all 0.2s;
+    margin: 0 auto 40px;
+  }
+
+  .play-btn:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 45px rgba(200,245,100,0.5);
+  }
+
+  .play-btn.active {
+    background: var(--danger);
+    box-shadow: 0 0 30px rgba(245,100,100,0.4);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Métronome <span>Vocal</span></h1>
+  <p class="subtitle">Exercices anti-bégaiement · Parole rythmée</p>
+</header>
+
+<!-- Orb -->
+<div class="orb-container" id="orbContainer">
+  <div class="orb-ring-2"></div>
+  <div class="orb-ring"></div>
+  <div class="orb-beat" id="orbBeat"></div>
+  <div class="orb" id="orb">
+    <div class="orb-icon">🎙️</div>
+    <div class="orb-label" id="orbLabel">En pause</div>
+  </div>
+</div>
+
+<!-- BPM -->
+<div class="bpm-display">
+  <div class="bpm-number" id="bpmNumber">60</div>
+  <div class="bpm-unit">Battements par minute</div>
+</div>
+
+<!-- Slider -->
+<div class="slider-section">
+  <div class="slider-labels">
+    <span>40 bpm · Très lent</span>
+    <span>Rapide · 120 bpm</span>
+  </div>
+  <input type="range" id="bpmSlider" min="40" max="120" value="60">
+</div>
+
+<!-- Presets -->
+<div class="presets">
+  <button class="preset-btn" data-bpm="40">40 · Débutant</button>
+  <button class="preset-btn active" data-bpm="60">60 · Lent</button>
+  <button class="preset-btn" data-bpm="80">80 · Moyen</button>
+  <button class="preset-btn" data-bpm="100">100 · Soutenu</button>
+  <button class="preset-btn" data-bpm="120">120 · Fluide</button>
+</div>
+
+<!-- Beat dots -->
+<div class="beat-dots" id="beatDots">
+  <div class="beat-dot"></div>
+  <div class="beat-dot"></div>
+  <div class="beat-dot"></div>
+  <div class="beat-dot"></div>
+</div>
+
+<!-- Play button -->
+<button class="play-btn" id="playBtn" title="Démarrer / Arrêter">▶</button>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat">
+    <div class="stat-value" id="statBeats">0</div>
+    <div class="stat-label">Battements</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="statTime">0:00</div>
+    <div class="stat-label">Durée</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="statPhrases">0</div>
+    <div class="stat-label">Phrases lues</div>
+  </div>
+</div>
+
+<!-- Exercise phrases -->
+<div class="exercise-section">
+  <div class="section-title">📖 Phrase d'exercice — parlez un mot par battement</div>
+  <div class="phrase-display" id="phraseDisplay"></div>
+  <div class="phrase-controls">
+    <div class="phrase-nav">
+      <button class="icon-btn" id="prevPhrase" title="Phrase précédente">◀</button>
+      <button class="icon-btn" id="nextPhrase" title="Phrase suivante">▶</button>
+      <button class="icon-btn" id="shufflePhrase" title="Aléatoire">⇄</button>
+    </div>
+    <div class="phrase-counter" id="phraseCounter">1 / 10</div>
+  </div>
+</div>
+
+<!-- Tip -->
+<div class="tip-box" id="tipBox">
+  <strong>💡 Conseil :</strong> Commencez lentement (40–60 bpm). Prononcez <em>un mot par battement</em>, en synchronisant votre souffle. Augmentez le tempo progressivement au fil des semaines.
+</div>
+
+<script>
+const phrases = [
+  "Je prends mon temps pour parler clairement.",
+  "Ma voix est posée et assurée.",
+  "Chaque mot sort naturellement.",
+  "Je respire avant de commencer à parler.",
+  "La fluidité vient avec la pratique.",
+  "Je suis calme, concentré, et ma parole est libre.",
+  "Aujourd'hui je progresse un peu plus.",
+  "Mon souffle soutient chaque syllabe.",
+  "Je m'exprime avec confiance et sérénité.",
+  "Parler est un plaisir, pas une contrainte.",
+];
+
+const tips = [
+  "Synchronisez chaque mot avec un battement. Ralentissez si vous anticipez.",
+  "Inspirez profondément avant chaque phrase. Le souffle est la clé.",
+  "Commencez par chuchoter la phrase en rythme, puis parlez normalement.",
+  "Prononcez sur l'expiration, jamais en retenant votre souffle.",
+  "Si un mot bloque, passez au suivant et revenez-y ensuite.",
+  "Progressez : 2 semaines à 60 bpm, puis montez à 80, puis 100.",
+];
+
+// State
+let isRunning = false;
+let bpm = 60;
+let interval = null;
+let beatCount = 0;
+let startTime = null;
+let currentPhraseIdx = 0;
+let currentWordIdx = 0;
+let phrasesRead = 0;
+let beatInPhrase = 0;
+let timerInterval = null;
+let dotIdx = 0;
+
+// AudioContext for click sound
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playClick(strong = false) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = strong ? 1000 : 700;
+    gain.gain.setValueAtTime(strong ? 0.6 : 0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.08);
+  } catch(e) {}
+}
+
+function renderPhrase(idx) {
+  const phrase = phrases[idx];
+  const words = phrase.split(' ');
+  const display = document.getElementById('phraseDisplay');
+  display.innerHTML = words.map((w, i) =>
+    `<span class="word" data-i="${i}">${w}</span>`
+  ).join(' ');
+  document.getElementById('phraseCounter').textContent = `${idx + 1} / ${phrases.length}`;
+  currentWordIdx = 0;
+  beatInPhrase = 0;
+}
+
+function highlightWord(wordIdx) {
+  const words = document.querySelectorAll('.word');
+  words.forEach((w, i) => w.classList.toggle('active', i === wordIdx));
+}
+
+function updateBeatDots() {
+  const dots = document.querySelectorAll('.beat-dot');
+  dots.forEach((d, i) => d.classList.toggle('lit', i === dotIdx % 4));
+  dotIdx++;
+}
+
+function tick() {
+  beatCount++;
+  const isStrong = (beatCount % 4 === 1);
+
+  playClick(isStrong);
+
+  // Orb flash
+  const orbBeat = document.getElementById('orbBeat');
+  orbBeat.classList.remove('flash');
+  void orbBeat.offsetWidth;
+  orbBeat.classList.add('flash');
+
+  updateBeatDots();
+
+  // Highlight word
+  const words = document.querySelectorAll('.word');
+  if (words.length > 0) {
+    highlightWord(beatInPhrase % words.length);
+    if (beatInPhrase > 0 && beatInPhrase % words.length === 0) {
+      phrasesRead++;
+      document.getElementById('statPhrases').textContent = phrasesRead;
+    }
+    beatInPhrase++;
+  }
+
+  document.getElementById('statBeats').textContent = beatCount;
+}
+
+function updateTimer() {
+  if (!startTime) return;
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  document.getElementById('statTime').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+}
+
+function start() {
+  isRunning = true;
+  beatCount = 0;
+  beatInPhrase = 0;
+  startTime = Date.now();
+  dotIdx = 0;
+
+  document.body.classList.add('running');
+  document.getElementById('orbContainer').classList.add('running');
+  document.getElementById('playBtn').textContent = '⏹';
+  document.getElementById('playBtn').classList.add('active');
+  document.getElementById('orbLabel').textContent = 'En cours';
+
+  const ms = (60 / bpm) * 1000;
+  interval = setInterval(tick, ms);
+  timerInterval = setInterval(updateTimer, 1000);
+  tick(); // immediate first beat
+}
+
+function stop() {
+  isRunning = false;
+  clearInterval(interval);
+  clearInterval(timerInterval);
+  interval = null;
+
+  document.body.classList.remove('running');
+  document.getElementById('orbContainer').classList.remove('running');
+  document.getElementById('playBtn').textContent = '▶';
+  document.getElementById('playBtn').classList.remove('active');
+  document.getElementById('orbLabel').textContent = 'En pause';
+
+  // Clear dots & words
+  document.querySelectorAll('.beat-dot').forEach(d => d.classList.remove('lit'));
+  document.querySelectorAll('.word').forEach(w => w.classList.remove('active'));
+
+  // Random tip
+  const tip = tips[Math.floor(Math.random() * tips.length)];
+  document.getElementById('tipBox').innerHTML = `<strong>💡 Conseil :</strong> ${tip}`;
+}
+
+function setBpm(val) {
+  bpm = Math.min(120, Math.max(40, val));
+  document.getElementById('bpmSlider').value = bpm;
+  document.getElementById('bpmNumber').textContent = bpm;
+
+  // Update preset active state
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.bpm) === bpm);
+  });
+
+  if (isRunning) {
+    clearInterval(interval);
+    const ms = (60 / bpm) * 1000;
+    interval = setInterval(tick, ms);
+  }
+}
+
+// Events
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (isRunning) stop(); else start();
+});
+
+document.getElementById('bpmSlider').addEventListener('input', e => {
+  setBpm(parseInt(e.target.value));
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => setBpm(parseInt(btn.dataset.bpm)));
+});
+
+document.getElementById('prevPhrase').addEventListener('click', () => {
+  currentPhraseIdx = (currentPhraseIdx - 1 + phrases.length) % phrases.length;
+  beatInPhrase = 0;
+  renderPhrase(currentPhraseIdx);
+});
+
+document.getElementById('nextPhrase').addEventListener('click', () => {
+  currentPhraseIdx = (currentPhraseIdx + 1) % phrases.length;
+  beatInPhrase = 0;
+  renderPhrase(currentPhraseIdx);
+});
+
+document.getElementById('shufflePhrase').addEventListener('click', () => {
+  currentPhraseIdx = Math.floor(Math.random() * phrases.length);
+  beatInPhrase = 0;
+  renderPhrase(currentPhraseIdx);
+});
+
+// Init
+renderPhrase(0);
+setBpm(60);
+</script>
+</body>
+</html>
